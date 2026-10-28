@@ -26,7 +26,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from .const import DOMAIN
 from .coordinator import XboxConfigEntry
-from .entity import XboxConsoleBaseEntity
+from .entity import XboxConsoleBaseEntity, check_command_response
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -143,7 +143,7 @@ class XboxRemote(XboxConsoleBaseEntity, RemoteEntity):
     @override
     async def async_turn_off(self, **kwargs: Any) -> None:
         """Turn the Xbox off."""
-        await self.client.smartglass.turn_off(self._console.id)
+        check_command_response(await self.client.smartglass.turn_off(self._console.id))
 
     @exception_handler
     @override
@@ -156,24 +156,21 @@ class XboxRemote(XboxConsoleBaseEntity, RemoteEntity):
             for single_command in command:
                 if single_command in InputKeyType:
                     button = InputKeyType(single_command)
-                    await self.client.smartglass.press_button(self._console.id, button)
+                    check_command_response(
+                        await self.client.smartglass.press_button(
+                            self._console.id, button
+                        )
+                    )
                 elif single_command in MAP_COMMAND:
-                    if (
-                        err := await MAP_COMMAND[single_command](
-                            self.client.smartglass
-                        )(self._console.id)
-                    ).status.error_code != "OK":
-                        _LOGGER.debug(
-                            "Xbox error: %s (%s)",
-                            err.status.error_message,
-                            err.status.error_code,
+                    check_command_response(
+                        await MAP_COMMAND[single_command](self.client.smartglass)(
+                            self._console.id
                         )
-                        raise HomeAssistantError(
-                            translation_domain=DOMAIN,
-                            translation_key="command_failed",
-                        )
+                    )
                 else:
-                    await self.client.smartglass.insert_text(
-                        self._console.id, single_command.removeprefix("text:")
+                    check_command_response(
+                        await self.client.smartglass.insert_text(
+                            self._console.id, single_command.removeprefix("text:")
+                        )
                     )
                 await asyncio.sleep(delay)

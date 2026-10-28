@@ -170,6 +170,10 @@ def mock_xbox_live_client() -> Generator[AsyncMock]:
         client.smartglass.go_back.return_value = command_response
         client.smartglass.show_guide_tab.return_value = command_response
         client.smartglass.show_tv_guide.return_value = command_response
+        client.smartglass.volume.return_value = command_response
+        client.smartglass.launch_app.return_value = command_response
+        client.smartglass.press_button.return_value = command_response
+        client.smartglass.insert_text.return_value = command_response
 
         client.catalog = AsyncMock()
         client.catalog.get_product_from_alternate_id.return_value = CatalogResponse(

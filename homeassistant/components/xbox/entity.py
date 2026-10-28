@@ -2,16 +2,22 @@
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+import logging
 from typing import Any, override
 
 from pythonxbox.api.provider.people.models import Person
-from pythonxbox.api.provider.smartglass.models import ConsoleType, SmartglassConsole
+from pythonxbox.api.provider.smartglass.models import (
+    CommandResponse,
+    ConsoleType,
+    SmartglassConsole,
+)
 from pythonxbox.api.provider.titlehub.models import Title
 from yarl import URL
 
 from homeassistant.components.automation import automations_with_entity
 from homeassistant.components.script import scripts_with_entity
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.entity import EntityDescription
@@ -37,6 +43,26 @@ MAP_MODEL = {
     ConsoleType.XboxSeriesS: "Xbox Series S",
     ConsoleType.XboxSeriesX: "Xbox Series X",
 }
+
+_LOGGER = logging.getLogger(__name__)
+
+
+def check_command_response(response: CommandResponse) -> None:
+    """Raise if the Xbox Network did not deliver a command to the console.
+
+    SmartGlass answers HTTP 200 whether or not the command reached the console,
+    so a failure such as ErrorCallingWNS is only visible in the response status.
+    """
+    if response.status.error_code != "OK":
+        _LOGGER.debug(
+            "Xbox error: %s (%s)",
+            response.status.error_message,
+            response.status.error_code,
+        )
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="command_failed",
+        )
 
 
 @dataclass(kw_only=True, frozen=True)

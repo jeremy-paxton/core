@@ -282,6 +282,8 @@ async def test_send_command_exceptions(
         ("GoBack", "go_back"),
         ("ShowGuideTab", "show_guide_tab"),
         ("ShowGuide", "show_tv_guide"),
+        ("A", "press_button"),
+        ("text:A", "insert_text"),
     ],
 )
 async def test_send_command_failed(
@@ -376,6 +378,34 @@ async def test_turn_on_failed(
             blocking=True,
         )
     assert e.value.translation_key == "turn_on_failed"
+
+
+async def test_turn_off_failed(
+    hass: HomeAssistant,
+    xbox_live_client: AsyncMock,
+    config_entry: MockConfigEntry,
+) -> None:
+    """Test remote turn off raises when the Xbox Network rejects the command."""
+
+    config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert config_entry.state is ConfigEntryState.LOADED
+
+    xbox_live_client.smartglass.turn_off.return_value = CommandResponse(
+        **await async_load_json_object_fixture(
+            hass, "smartglass_command_response_error.json", DOMAIN
+        )  # type: ignore[reportArgumentType]
+    )
+    with pytest.raises(HomeAssistantError) as e:
+        await hass.services.async_call(
+            REMOTE_DOMAIN,
+            SERVICE_TURN_OFF,
+            target={ATTR_ENTITY_ID: "remote.xone"},
+            blocking=True,
+        )
+    assert e.value.translation_key == "command_failed"
 
 
 @pytest.mark.parametrize(

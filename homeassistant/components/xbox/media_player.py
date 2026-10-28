@@ -27,7 +27,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from .browse_media import build_item_response
 from .const import DOMAIN
 from .coordinator import XboxConfigEntry
-from .entity import XboxConsoleBaseEntity, to_https
+from .entity import XboxConsoleBaseEntity, check_command_response, to_https
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -210,7 +210,7 @@ class XboxMediaPlayer(XboxConsoleBaseEntity, MediaPlayerEntity):
     @override
     async def async_turn_off(self) -> None:
         """Turn the media player off."""
-        await self.client.smartglass.turn_off(self._console.id)
+        check_command_response(await self.client.smartglass.turn_off(self._console.id))
 
     @exception_handler
     @override
@@ -218,9 +218,11 @@ class XboxMediaPlayer(XboxConsoleBaseEntity, MediaPlayerEntity):
         """Mute the volume."""
 
         if mute:
-            await self.client.smartglass.mute(self._console.id)
+            check_command_response(await self.client.smartglass.mute(self._console.id))
         else:
-            await self.client.smartglass.unmute(self._console.id)
+            check_command_response(
+                await self.client.smartglass.unmute(self._console.id)
+            )
 
         self._attr_is_volume_muted = mute
         self.async_write_ha_state()
@@ -230,42 +232,46 @@ class XboxMediaPlayer(XboxConsoleBaseEntity, MediaPlayerEntity):
     async def async_volume_up(self) -> None:
         """Turn volume up for media player."""
 
-        await self.client.smartglass.volume(self._console.id, VolumeDirection.Up)
+        check_command_response(
+            await self.client.smartglass.volume(self._console.id, VolumeDirection.Up)
+        )
 
     @exception_handler
     @override
     async def async_volume_down(self) -> None:
         """Turn volume down for media player."""
 
-        await self.client.smartglass.volume(self._console.id, VolumeDirection.Down)
+        check_command_response(
+            await self.client.smartglass.volume(self._console.id, VolumeDirection.Down)
+        )
 
     @exception_handler
     @override
     async def async_media_play(self) -> None:
         """Send play command."""
 
-        await self.client.smartglass.play(self._console.id)
+        check_command_response(await self.client.smartglass.play(self._console.id))
 
     @exception_handler
     @override
     async def async_media_pause(self) -> None:
         """Send pause command."""
 
-        await self.client.smartglass.pause(self._console.id)
+        check_command_response(await self.client.smartglass.pause(self._console.id))
 
     @exception_handler
     @override
     async def async_media_previous_track(self) -> None:
         """Send previous track command."""
 
-        await self.client.smartglass.previous(self._console.id)
+        check_command_response(await self.client.smartglass.previous(self._console.id))
 
     @exception_handler
     @override
     async def async_media_next_track(self) -> None:
         """Send next track command."""
 
-        await self.client.smartglass.next(self._console.id)
+        check_command_response(await self.client.smartglass.next(self._console.id))
 
     @override
     async def async_browse_media(
@@ -290,9 +296,14 @@ class XboxMediaPlayer(XboxConsoleBaseEntity, MediaPlayerEntity):
         """Launch an app on the Xbox."""
 
         if media_id == "Home":
-            await self.client.smartglass.go_home(self._console.id)
+            check_command_response(
+                await self.client.smartglass.go_home(self._console.id)
+            )
+            return
 
-        await self.client.smartglass.launch_app(self._console.id, media_id)
+        check_command_response(
+            await self.client.smartglass.launch_app(self._console.id, media_id)
+        )
 
 
 def _find_media_image(images: list[Image]) -> Image | None:

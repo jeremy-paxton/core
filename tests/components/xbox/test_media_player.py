@@ -422,3 +422,97 @@ async def test_media_player_turn_on_failed(
             blocking=True,
         )
     assert e.value.translation_key == "turn_on_failed"
+
+
+@pytest.mark.parametrize(
+    ("service", "service_args", "call_method"),
+    [
+        (SERVICE_TURN_OFF, {}, "turn_off"),
+        (SERVICE_VOLUME_MUTE, {ATTR_MEDIA_VOLUME_MUTED: False}, "unmute"),
+        (SERVICE_VOLUME_MUTE, {ATTR_MEDIA_VOLUME_MUTED: True}, "mute"),
+        (SERVICE_VOLUME_UP, {}, "volume"),
+        (SERVICE_VOLUME_DOWN, {}, "volume"),
+        (SERVICE_MEDIA_PLAY, {}, "play"),
+        (SERVICE_MEDIA_PAUSE, {}, "pause"),
+        (SERVICE_MEDIA_PREVIOUS_TRACK, {}, "previous"),
+        (SERVICE_MEDIA_NEXT_TRACK, {}, "next"),
+        (
+            SERVICE_PLAY_MEDIA,
+            {ATTR_MEDIA_CONTENT_TYPE: MediaType.APP, ATTR_MEDIA_CONTENT_ID: "Home"},
+            "go_home",
+        ),
+        (
+            SERVICE_PLAY_MEDIA,
+            {
+                ATTR_MEDIA_CONTENT_TYPE: MediaType.APP,
+                ATTR_MEDIA_CONTENT_ID: "327370029",
+            },
+            "launch_app",
+        ),
+    ],
+)
+async def test_media_player_action_failed(
+    hass: HomeAssistant,
+    xbox_live_client: AsyncMock,
+    config_entry: MockConfigEntry,
+    service: str,
+    service_args: dict[str, Any],
+    call_method: str,
+) -> None:
+    """Test media player actions raise when the Xbox Network rejects them."""
+
+    xbox_live_client.smartglass.get_console_status.return_value = (
+        SmartglassConsoleStatus(
+            **await async_load_json_object_fixture(
+                hass, "smartglass_console_status_playing.json", DOMAIN
+            )  # pyright: ignore[reportArgumentType]
+        )
+    )
+    config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert config_entry.state is ConfigEntryState.LOADED
+
+    getattr(xbox_live_client.smartglass, call_method).return_value = CommandResponse(
+        **await async_load_json_object_fixture(
+            hass, "smartglass_command_response_error.json", DOMAIN
+        )  # type: ignore[reportArgumentType]
+    )
+
+    with pytest.raises(HomeAssistantError) as e:
+        await hass.services.async_call(
+            MEDIA_PLAYER_DOMAIN,
+            service,
+            target={ATTR_ENTITY_ID: "media_player.xone", **service_args},
+            blocking=True,
+        )
+    assert e.value.translation_key == "command_failed"
+
+
+async def test_media_player_play_media_home(
+    hass: HomeAssistant,
+    xbox_live_client: AsyncMock,
+    config_entry: MockConfigEntry,
+) -> None:
+    """Test playing Home goes to the dashboard and does not also launch an app."""
+
+    config_entry.add_to_hass(hass)
+    await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    assert config_entry.state is ConfigEntryState.LOADED
+
+    await hass.services.async_call(
+        MEDIA_PLAYER_DOMAIN,
+        SERVICE_PLAY_MEDIA,
+        target={
+            ATTR_ENTITY_ID: "media_player.xone",
+            ATTR_MEDIA_CONTENT_TYPE: MediaType.APP,
+            ATTR_MEDIA_CONTENT_ID: "Home",
+        },
+        blocking=True,
+    )
+
+    xbox_live_client.smartglass.go_home.assert_called_once_with("HIJKLMN")
+    xbox_live_client.smartglass.launch_app.assert_not_called()
